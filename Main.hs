@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo #-}
 import Reflex
 import Reflex.Dom
 import Data.Map (Map, fromList)
@@ -7,57 +6,77 @@ import Data.Text (Text, pack)
 import Data.Time.Clock (NominalDiffTime, getCurrentTime)
 import Control.Monad.Trans (liftIO)
 
-
-height = 600
-width = 600
-
 rowCount = 100
-colCount = 100
+colCount = 200
 
 svgns :: Maybe Text
 svgns = (Just "http://www.w3.org/2000/svg")
 
-updateFrequency :: NominalDiffTime
-updateFrequency = 0.1
+type Model = [Bool]
 
-type Model = (Int,Int)
+showCell :: (MonadWidget t m) => Int -> Dynamic t Int -> m ()
+showCell level column = do
+    let attrs column = fromList 
+                           [ ("r" , "0.3")
+                           , ("fill", "purple")
+                           , ("cy", pack $ show level)
+                           , ("cx", pack $ show column)
+                           ]
+    elDynAttrNS' svgns "circle" (fmap attrs column) $ return ()
+    return ()
 
-showEvent :: (MonadWidget t m) => Int -> Model -> Event t Model -> m ()
-showEvent index v@(x,y) _ = do
-    let dynXY = constDyn v
-        attrs (x,y) = fromList 
-                        [ ("r" , "10.0")
-                        , ("fill", "purple")
-                        , ("cy", pack $ show y)
-                        , ("cx", pack $ show x)
-                        ]
-    elDynAttrNS' svgns "circle" (fmap attrs dynXY) $ return ()
+showRow :: (MonadWidget t m) => Int -> Model -> Event t Model -> m ()
+showRow level v _ = do
+    let living = fmap (\(index, live) -> index) 
+                 $ filter (\(index, live) -> live) 
+                 $ zip [0..] v
+
+    simpleList (constDyn living) (showCell level)
     return ()
 
 step :: a -> (Int,Maybe Model) -> (Int,Maybe Model)
-step _ (index, Just (x,y)) = (index+1,Just (x+5, y+5))
-
-initModel :: Model
-initModel = (50,50)
-
-pairToMap :: Ord k => (k, v) -> Map k v
-pairToMap = fromList.(\x->x:[])
+step _ v@(level, Just model) = 
+    if level == rowCount then v
+    else let gen d0 d1 d2 = 
+              case (d0,d1,d2) of
+                (False,  False,   True) -> True
+                (False,   True,  False) -> True
+                (False,   True,   True) -> True
+                ( True,  False,  False) -> True
+                _                       -> False
+             left = (tail model ++ [False])
+             right = (False : model)
+             nextGen = zipWith3 gen left model right
+         in (level+1, Just nextGen)
+    
+init :: Model
+init = 
+    let halfCount = colCount `div` 2 
+        halfSpan = take halfCount $ repeat False
+    in tail  (halfSpan ++ True : halfSpan)
 
 main :: IO ()
 main = mainWidget $ do
-    let attrs = constDyn $ 
+    let pairToMap = fromList.(\x->x:[])
+        attrs = constDyn $ 
                     fromList 
-                        [ ("width" , pack $ show width)
-                        , ("height", pack $ show height)
+                        [ ("width" , "900")
+                        , ("height", "450")
                         , ("style" , "border:solid; margin:8em")
+                        , ("viewBox" , pack $ unwords
+                                                [ show (0 :: Int)
+                                                , show (0 :: Int)
+                                                , show colCount
+                                                , show rowCount
+                                                ] )
                         ]
 
-        initial = pairToMap (0,initModel)
+        initial = pairToMap (0,Main.init)
 
-    progress <- foldDyn step (0,Just initModel) 
-                    =<< tickLossy  updateFrequency 
-                    =<< liftIO getCurrentTime
+    progress <- foldDyn step (0,Just Main.init) 
+                =<< tickLossy  0.1
+                =<< liftIO getCurrentTime
 
     let progressEvents = updated $ fmap pairToMap progress
-    elDynAttrNS' svgns "svg" attrs $ listWithKeyShallowDiff initial progressEvents showEvent
+    elDynAttrNS' svgns "svg" attrs $ listWithKeyShallowDiff initial progressEvents showRow
     return ()
