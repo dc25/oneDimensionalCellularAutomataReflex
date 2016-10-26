@@ -20,14 +20,16 @@ svgns = (Just "http://www.w3.org/2000/svg")
 updateFrequency :: NominalDiffTime
 updateFrequency = 0.5
 
-showEvent :: (MonadWidget t m) => Int -> (Int,Int) -> Event t (Int,Int) -> m ()
-showEvent index v@(x,y) e = do
-    dynXY <- holdDyn v e
-    let attrs (x,y) = DM.fromList 
+type Model = (Int,Int)
+
+showEvent :: (MonadWidget t m) => Int -> Model -> Event t Model -> m ()
+showEvent index v@(x,y) _ = do
+    let dynXY = constDyn v
+        attrs (x,y) = DM.fromList 
                         [ ("r" , "10.0")
                         , ("fill", "purple")
                         , ("cy", pack $ show x)
-                        , ("cx", pack $ show y)
+                        , ("cx", pack $ show index)
                         ]
     elDynAttrNS' svgns "circle" (fmap attrs dynXY) $ return ()
     return ()
