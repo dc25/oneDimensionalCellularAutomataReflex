@@ -28,11 +28,17 @@ showEvent index v@(x,y) _ = do
         attrs (x,y) = DM.fromList 
                         [ ("r" , "10.0")
                         , ("fill", "purple")
-                        , ("cy", pack $ show x)
-                        , ("cx", pack $ show index)
+                        , ("cy", pack $ show y)
+                        , ("cx", pack $ show x)
                         ]
     elDynAttrNS' svgns "circle" (fmap attrs dynXY) $ return ()
     return ()
+
+updateModel :: a -> (Int,Maybe Model) -> (Int,Maybe Model)
+updateModel _ (index, Just (x,y)) = (index+1,Just (x+100, y+100))
+
+initModel :: Model
+initModel = (50,50)
 
 main :: IO ()
 main = mainWidget $ do
@@ -44,11 +50,12 @@ main = mainWidget $ do
                         , ("style" , "border:solid; margin:8em")
                         ]
 
-        initial = (0,(50,50))
+        modelToMap = fromList.(\x->x:[])
 
-    progress <- foldDyn (\_ (index,Just (cx, cy)) -> (index+1,Just (cx +100, cy+100))) 
-                        (0,Just (100,100))
-                        tickEvent
-    let progressEvents = updated $ fmap (fromList.(\x->x:[])) progress
-    elDynAttrNS' svgns "svg" attrs $ listWithKeyShallowDiff (fromList [initial]) progressEvents showEvent
+        initial = modelToMap (0,initModel)
+
+    progress <- foldDyn updateModel (0,Just initModel) tickEvent
+
+    let progressEvents = updated $ fmap modelToMap progress
+    elDynAttrNS' svgns "svg" attrs $ listWithKeyShallowDiff initial progressEvents showEvent
     return ()
