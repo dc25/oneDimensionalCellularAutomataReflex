@@ -6,8 +6,8 @@ import Data.Text (Text, pack)
 import Data.Time.Clock (NominalDiffTime, getCurrentTime)
 import Control.Monad.Trans (liftIO)
 
-rowCount = 100
-colCount = 200
+rowCount = 200
+colCount = 400
 
 svgns :: Maybe Text
 svgns = (Just "http://www.w3.org/2000/svg")
@@ -25,8 +25,8 @@ showCell level column = do
     elDynAttrNS' svgns "circle" (fmap attrs column) $ return ()
     return ()
 
-showRow :: (MonadWidget t m) => Int -> Model -> Event t Model -> m ()
-showRow level v _ = do
+showRow :: (MonadWidget t m) => Int -> Model -> m ()
+showRow level v = do
     let living = fmap (\(index, live) -> index) 
                  $ filter (\(index, live) -> live) 
                  $ zip [0..] v
@@ -60,8 +60,8 @@ main = mainWidget $ do
     let pairToMap = fromList.(\x->x:[])
         attrs = constDyn $ 
                     fromList 
-                        [ ("width" , "900")
-                        , ("height", "450")
+                        [ ("width" , "1000")
+                        , ("height", "500")
                         , ("style" , "border:solid; margin:8em")
                         , ("viewBox" , pack $ unwords
                                                 [ show (0 :: Int)
@@ -78,5 +78,5 @@ main = mainWidget $ do
                 =<< liftIO getCurrentTime
 
     let progressEvents = updated $ fmap pairToMap progress
-    elDynAttrNS' svgns "svg" attrs $ listWithKeyShallowDiff initial progressEvents showRow
+    elDynAttrNS' svgns "svg" attrs $ listHoldWithKey initial progressEvents showRow
     return ()
